@@ -309,7 +309,14 @@ export default function ReservationForm() {
                 />
               </div>
 
-              <Button type="submit" disabled={!isFormValid || isSubmitting} className="w-full" aria-busy={isSubmitting}>
+              <Button
+                type="submit"
+                // if you wanna try the version where the button is disabled while the values are invalid
+                // disabled={!isFormValid || isSubmitting}
+                disabled={isSubmitting}
+                className="w-full"
+                aria-busy={isSubmitting}
+              >
                 {isSubmitting ? "Sending…" : "Confirm reservation"}
               </Button>
             </form>
