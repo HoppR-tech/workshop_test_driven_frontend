@@ -1,75 +1,55 @@
-# React + TypeScript + Vite
+```gherkin
+Feature: Classement des saisies dans le Delimiter Checker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+  Background:
+    Given le composant est configuré avec les délimiteurs "," et ";"
+    And les validateurs disponibles sont "email", "ipAddress", "personName"
 
-Currently, two official plugins are available:
+  Rule: Segmenter la saisie selon les délimiteurs fournis
+    Scenario Outline: Découper la saisie au fil de la frappe
+      Given l’utilisateur saisit "<input>"
+      Then les valeurs capturées sont "<tokens>"
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+      Examples:
+        | input                                 | tokens                                 |
+        | alice@example.com,192.168.0.1         | alice@example.com | 192.168.0.1         |
+        | jean.dupont@example.com;Claire Martin | jean.dupont@example.com | Claire Martin |
 
-## React Compiler
+  Rule: Catégoriser chaque fragment via les validateurs
+    Scenario Outline: Déterminer la catégorie d’un token
+      Given le composant reçoit le token "<token>"
+      Then le token est classé comme "<category>"
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+      Examples:
+        | token             | category   |
+        | alice@example.com | email      |
+        | 10.0.0.42         | ipAddress  |
+        | Marie Curie       | personName |
 
-Note: This will impact Vite dev & build performances.
+    Scenario: Marquer un token non reconnu comme invalide
+      Given le composant reçoit le token "foo@bar"
+      Then le token est classé comme "invalid"
+      And il n’appartient à aucune autre catégorie
 
-## Expanding the ESLint configuration
+  Rule: Afficher les tokens invalides avant les valides
+    Scenario: Ordre d’affichage des catégories
+      Given les tokens capturés sont "foo", "alice@example.com", "192.168.0.1"
+      And "foo" est invalide
+      When la liste est rendue
+      Then "foo" s’affiche avant "alice@example.com"
+      And "alice@example.com" s’affiche avant "192.168.0.1"
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+  Rule: Cliquer un token pour le rééditer
+    Scenario: Réinjection d’un token valide
+      Given la liste contient les tokens valides "alice@example.com", "192.168.0.1"
+      When l’utilisateur clique "alice@example.com"
+      Then "alice@example.com" est retiré de la liste
+      And l’input contient "alice@example.com"
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+    Scenario: Réinjection d’un token invalide
+      Given la liste invalide contient "foo"
+      When l’utilisateur clique "foo"
+      Then "foo" est retiré de la section invalide
+      And l’input contient "foo"
+      And les autres tokens restent inchangés
 ```
