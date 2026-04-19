@@ -20,10 +20,24 @@ describe("SecretExposureGuard", () => {
     await fixture.when_the_user_is_inactive();
     fixture.then_the_guard_is_in_idle_mode();
   });
+
+  test("Rule: the guard in 'idle' mode goes back to 'visible' mode on user activity", async () => {
+    const one_second_and_a_half = ONE_SECOND * 1.5;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_user_is_inactive_for(one_second_and_a_half);
+    await fixture.when_the_user_is_active_by("clicking");
+    fixture.then_the_guard_is_in_visible_mode();
+  });
 });
 
 type SecretGuardMode = "visible" | "idle";
 type GracePeriod = number;
+
+type SecretExposureGuardDriver = {
+  addEventListener: typeof window.addEventListener;
+  removeEventListener: typeof window.removeEventListener;
+};
 
 class SecretExposureGuard extends Subscriber<unknown> {
   getPayload(): undefined {
@@ -31,9 +45,11 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   private _mode: SecretGuardMode = "visible";
+  private idle_timer_id: NodeJS.Timeout | null = null;
 
   constructor(
-    private grace_period: GracePeriod = ONE_SECOND,
+    private readonly grace_period: GracePeriod = ONE_SECOND,
+    private readonly driver: SecretExposureGuardDriver
   ) {
     super();
   }
@@ -47,23 +63,63 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   public start(): void {
+    this.driver.addEventListener("mousedown", this.handle_user_activity);
+
+    this.schedule_idle_timer();
+  }
+
+  // why an arroe function ? to preserve the context of `this` through the callbacks
+  // I could have usee `this.handle_user_activity.bind(this)` too in the `addEventListener` call
+  private handle_user_activity = () => {
+    this.mode = "visible";
+
     this.schedule_idle_timer();
   }
 
   private schedule_idle_timer(): void {
-    setTimeout(() => {
+    this.clear_idle_timer();
+
+    this.idle_timer_id = setTimeout(() => {
       this.mode = "idle";
     }, this.grace_period);
   }
 
+  private clear_idle_timer(): void {
+    if (this.idle_timer_id) {
+      clearTimeout(this.idle_timer_id);
+      this.idle_timer_id = null;
+    }
+  }
 }
 
-function createSecretExposureGuard() {
-  return new SecretExposureGuard();
+class SecretExposureGuardDriverMock {
+  private listeners = new Map<string, Set<EventListener>>();
+
+  public addEventListener(event: string, listener: EventListener) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(listener);
+  }
+
+  public removeEventListener(event: string, listener: EventListener) {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public emit(event: string, payload?: any) {
+    console.log(event, payload);
+    console.log(this.listeners.get(event));
+    this.listeners.get(event)?.forEach((listener) => {
+      listener(payload);
+    });
+  }
 }
 
 class Fixture {
   private secretGuard: SecretExposureGuard;
+  private driver_mock = new SecretExposureGuardDriverMock();
+  private time_to_wait: number = undefined;
 
   private grace_period: number;
 
@@ -72,25 +128,45 @@ class Fixture {
   }
 
   private create_guard() {
-    this.secretGuard = createSecretExposureGuard();
+    this.secretGuard = new SecretExposureGuard(this.grace_period, this.driver_mock);
+  }
+
+  private should_wait(): boolean {
+    return this.time_to_wait !== undefined;
   }
 
   private start_guard() {
     this.create_guard();
     this.secretGuard.start();
+
+    if (this.should_wait()) {
+      jest.advanceTimersByTime(this.time_to_wait);
+    }
   }
 
-  public given_the_grace_period_is(grace_period: number) {
+  public given_the_grace_period_is(grace_period: GracePeriod) {
     this.grace_period = grace_period;
   }
 
+  public given_the_user_is_inactive_for(time: number) {
+    this.time_to_wait = time;
+  }
+
   public async when_the_guard_start() {
-    this.create_guard();
+    this.start_guard();
   }
 
   public async when_the_user_is_inactive() {
     this.start_guard();
     jest.advanceTimersByTime(this.grace_period + 1);
+  }
+
+  public async when_the_user_is_active_by(action: "clicking") {
+    this.start_guard();
+
+    if (action === "clicking") {
+      this.driver_mock.emit("mousedown");
+    }
   }
 
   public then_the_guard_is_in_visible_mode() {
