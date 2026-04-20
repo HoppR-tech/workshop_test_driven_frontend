@@ -36,6 +36,21 @@ describe("SecretExposureGuard", () => {
     await fixture.when_the_user_is_active_by(action);
     fixture.then_the_guard_is_in_visible_mode();
   });
+
+  test("Rule: a user that stays active during the grace period should stay 'visible'", async () => {
+    const zero_point_eight_seconds = 800;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    await fixture
+      .when_user_activity_is()
+      .inactive_for(zero_point_eight_seconds)
+      .then()
+      .active_by("clicking")
+      .then()
+      .inactive_for(zero_point_eight_seconds)
+      .run();
+    fixture.then_the_guard_is_in_visible_mode();
+  });
 });
 
 type SecretGuardMode = "visible" | "idle";
@@ -133,6 +148,56 @@ class SecretExposureGuardDriverMock {
   }
 }
 
+interface PlayableAction {
+  play(): Promise<void>;
+}
+
+class InactiveAction implements PlayableAction {
+  constructor(private readonly time: number) { }
+
+  public async play() {
+    jest.advanceTimersByTime(this.time);
+  }
+}
+
+class ActiveAction implements PlayableAction {
+  constructor(private fixture: Fixture, private readonly action: UserActivityActions) { }
+
+  public async play() {
+    await this.fixture.when_the_user_action_is(this.action);
+  }
+}
+
+class UserActivitySequence {
+  private sequence: PlayableAction[] = [];
+
+  constructor(private fixture: Fixture) {
+  }
+
+  public inactive_for(time: number) {
+    this.sequence.push(new InactiveAction(time));
+    return this;
+  }
+
+  public then() {
+    return this;
+  }
+
+  public active_by(action: UserActivityActions) {
+    this.sequence.push(new ActiveAction(this.fixture, action));
+    return this;
+  }
+
+  public async run() {
+    await this.fixture.when_the_guard_start();
+
+    while (this.sequence.length > 0) {
+      const action = this.sequence.shift()!;
+      await action.play();
+    }
+  }
+}
+
 type UserActivityActions = "clicking" | "moving_mouse" | "typing" | "touching" | "pointing" | "scrolling";
 
 const activityEvents = {
@@ -176,6 +241,7 @@ class Fixture {
     }
   }
 
+  //#region Given
   public given_the_grace_period_is(grace_period: GracePeriod) {
     this.grace_period = grace_period;
   }
@@ -183,7 +249,9 @@ class Fixture {
   public given_the_user_is_inactive_for(time: number) {
     this.time_to_wait = time;
   }
+  //#endregion Given
 
+  //#region When
   public async when_the_guard_start() {
     this.start_guard();
   }
@@ -193,6 +261,9 @@ class Fixture {
     jest.advanceTimersByTime(this.grace_period + 1);
   }
 
+  public async when_the_user_action_is(action: UserActivityActions) {
+    this.driver_mock.emit(this.get_event(action));
+  }
 
   public async when_the_user_is_active_by(action: UserActivityActions) {
     this.start_guard();
@@ -200,6 +271,12 @@ class Fixture {
     this.driver_mock.emit(this.get_event(action));
   }
 
+  public when_user_activity_is() {
+    return new UserActivitySequence(this);
+  }
+  //#endregion When
+
+  //#region Then
   public then_the_guard_is_in_visible_mode() {
     expect(this.secretGuard.mode).toBe("visible");
   }
@@ -207,4 +284,5 @@ class Fixture {
   public then_the_guard_is_in_idle_mode() {
     expect(this.secretGuard.mode).toBe("idle");
   }
+  //#endregion Then
 }
