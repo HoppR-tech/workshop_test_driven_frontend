@@ -21,12 +21,19 @@ describe("SecretExposureGuard", () => {
     fixture.then_the_guard_is_in_idle_mode();
   });
 
-  test("Rule: the guard in 'idle' mode goes back to 'visible' mode on user activity", async () => {
+  test.each([
+    { action: "clicking" },
+    { action: "moving_mouse" },
+    { action: "typing" },
+    { action: "moving_pointer" },
+    { action: "moving_touch" },
+    { action: "scrolling" },
+  ])("Rule: the guard in 'idle' mode goes back to 'visible' mode on user activity by $action", async ({ action }: { action: UserActivityActions }) => {
     const one_second_and_a_half = ONE_SECOND * 1.5;
 
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_user_is_inactive_for(one_second_and_a_half);
-    await fixture.when_the_user_is_active_by("clicking");
+    await fixture.when_the_user_is_active_by(action);
     fixture.then_the_guard_is_in_visible_mode();
   });
 });
@@ -49,7 +56,15 @@ class SecretExposureGuard extends Subscriber<unknown> {
 
   constructor(
     private readonly grace_period: GracePeriod = ONE_SECOND,
-    private readonly driver: SecretExposureGuardDriver
+    private readonly driver: SecretExposureGuardDriver,
+    private readonly user_activity_events = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "pointerdown",
+      "scroll",
+    ],
   ) {
     super();
   }
@@ -63,7 +78,9 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   public start(): void {
-    this.driver.addEventListener("mousedown", this.handle_user_activity);
+    this.user_activity_events.forEach((event) => {
+      this.driver.addEventListener(event, this.handle_user_activity);
+    });
 
     this.schedule_idle_timer();
   }
@@ -116,6 +133,17 @@ class SecretExposureGuardDriverMock {
   }
 }
 
+type UserActivityActions = "clicking" | "moving_mouse" | "typing" | "touching" | "pointing" | "scrolling";
+
+const activityEvents = {
+  moving_mouse: "mousemove",
+  clicking: "mousedown",
+  typing: "keydown",
+  touching: "touchstart",
+  pointing: "pointerdown",
+  scrolling: "scroll",
+}
+
 class Fixture {
   private secretGuard: SecretExposureGuard;
   private driver_mock = new SecretExposureGuardDriverMock();
@@ -133,6 +161,10 @@ class Fixture {
 
   private should_wait(): boolean {
     return this.time_to_wait !== undefined;
+  }
+
+  private get_event(action: UserActivityActions) {
+    return activityEvents[action] ?? activityEvents.clicking;
   }
 
   private start_guard() {
@@ -161,12 +193,11 @@ class Fixture {
     jest.advanceTimersByTime(this.grace_period + 1);
   }
 
-  public async when_the_user_is_active_by(action: "clicking") {
+
+  public async when_the_user_is_active_by(action: UserActivityActions) {
     this.start_guard();
 
-    if (action === "clicking") {
-      this.driver_mock.emit("mousedown");
-    }
+    this.driver_mock.emit(this.get_event(action));
   }
 
   public then_the_guard_is_in_visible_mode() {
