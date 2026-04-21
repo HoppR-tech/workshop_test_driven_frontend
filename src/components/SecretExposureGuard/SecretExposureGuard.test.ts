@@ -1,6 +1,7 @@
 import { Subscriber } from "./SecretExposureGuard";
 
 const ONE_SECOND = 1000;
+const ONE_MINUTE = 60 * ONE_SECOND;
 
 /* eslint-disable no-restricted-syntax */
 describe("SecretExposureGuard", () => {
@@ -51,10 +52,20 @@ describe("SecretExposureGuard", () => {
       .run();
     fixture.then_the_guard_is_in_visible_mode();
   });
+
+  test("Rule: the guard should go to 'hidden' mode once the inactivity duration as been reached", async () => {
+    const one_minute_and_one_second = ONE_MINUTE + ONE_SECOND;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(ONE_MINUTE)
+    await fixture.when_the_user_is_inactive_for(one_minute_and_one_second);
+    fixture.then_the_guard_is_in_hidden_mode();
+  });
 });
 
-type SecretGuardMode = "visible" | "idle";
+type SecretGuardMode = "visible" | "idle" | "hidden";
 type GracePeriod = number;
+type InactivityDuration = number;
 
 type SecretExposureGuardDriver = {
   addEventListener: typeof window.addEventListener;
@@ -68,9 +79,11 @@ class SecretExposureGuard extends Subscriber<unknown> {
 
   private _mode: SecretGuardMode = "visible";
   private idle_timer_id: NodeJS.Timeout | null = null;
+  private hidden_timer_id: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly grace_period: GracePeriod = ONE_SECOND,
+    private readonly inactivity_duration: InactivityDuration = ONE_MINUTE,
     private readonly driver: SecretExposureGuardDriver,
     private readonly user_activity_events = [
       "mousemove",
@@ -113,7 +126,14 @@ class SecretExposureGuard extends Subscriber<unknown> {
 
     this.idle_timer_id = setTimeout(() => {
       this.mode = "idle";
+      this.schedule_hidden_timer();
     }, this.grace_period);
+  }
+
+  private schedule_hidden_timer(): void {
+    this.hidden_timer_id = setTimeout(() => {
+      this.mode = "hidden";
+    }, this.inactivity_duration);
   }
 
   private clear_idle_timer(): void {
@@ -215,13 +235,14 @@ class Fixture {
   private time_to_wait: number = undefined;
 
   private grace_period: number;
+  private inactivity_duration: number;
 
   constructor() {
     jest.useFakeTimers();
   }
 
   private create_guard() {
-    this.secretGuard = new SecretExposureGuard(this.grace_period, this.driver_mock);
+    this.secretGuard = new SecretExposureGuard(this.grace_period, this.inactivity_duration, this.driver_mock);
   }
 
   private should_wait(): boolean {
@@ -246,6 +267,10 @@ class Fixture {
     this.grace_period = grace_period;
   }
 
+  public given_the_inactivity_duration_is(inactivity_duration: number) {
+    this.inactivity_duration = inactivity_duration;
+  }
+
   public given_the_user_is_inactive_for(time: number) {
     this.time_to_wait = time;
   }
@@ -259,6 +284,11 @@ class Fixture {
   public async when_the_user_is_inactive() {
     this.start_guard();
     jest.advanceTimersByTime(this.grace_period + 1);
+  }
+
+  public async when_the_user_is_inactive_for(duration: number) {
+    this.start_guard();
+    jest.advanceTimersByTime(duration);
   }
 
   public async when_the_user_action_is(action: UserActivityActions) {
@@ -283,6 +313,10 @@ class Fixture {
 
   public then_the_guard_is_in_idle_mode() {
     expect(this.secretGuard.mode).toBe("idle");
+  }
+
+  public then_the_guard_is_in_hidden_mode() {
+    expect(this.secretGuard.mode).toBe("hidden");
   }
   //#endregion Then
 }
