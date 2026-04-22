@@ -137,6 +137,13 @@ describe("SecretExposureGuard", () => {
       fixture.then_the_guard_is_in_hidden_mode();
     });
   });
+
+  test("Rule: the guard can manually be switched to 'hidden' mode", async () => {
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+    await fixture.when_the_user_hides();
+    fixture.then_the_guard_is_in_hidden_mode();
+  })
 });
 
 type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
@@ -191,8 +198,9 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   public hide(): void {
-    this.remove_user_activity_listeners();
+    this.mode = "hidden";
 
+    this.remove_user_activity_listeners();
     this.clear_idle_timer();
     this.clear_hidden_timer();
   }
@@ -248,7 +256,6 @@ class SecretExposureGuard extends Subscriber<unknown> {
     const inactivity_duration = this.inactivity_duration - this.grace_period;
 
     this.hidden_timer_id = setTimeout(() => {
-      this.mode = "hidden";
       this.hide();
     }, inactivity_duration);
   }
@@ -463,6 +470,12 @@ class Fixture {
 
   public when_show_again() {
     this.secretGuard.show();
+  }
+
+  public async when_the_user_hides() {
+    this.start_guard();
+
+    this.secretGuard.hide();
   }
   //#endregion When
 
