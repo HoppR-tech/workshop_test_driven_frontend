@@ -192,7 +192,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
     if (this.mode === "locked") return;
 
     this.add_user_activity_listeners();
-    this.schedule_hidden_timer();
+    this.schedule_idle_timer();
 
     this.mode = "visible";
   }
