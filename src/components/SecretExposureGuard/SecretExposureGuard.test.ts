@@ -19,7 +19,7 @@ describe("SecretExposureGuard", () => {
 
   test("Rule: after a defined _grace period_ of inactivity the guard goes to 'idle' mode", async () => {
     fixture.given_the_grace_period_is(ONE_SECOND);
-    await fixture.when_the_user_is_inactive();
+    await fixture.when_the_user_is_inactive_for(ONE_SECOND);
     fixture.then_the_guard_is_in_idle_mode();
   });
 
