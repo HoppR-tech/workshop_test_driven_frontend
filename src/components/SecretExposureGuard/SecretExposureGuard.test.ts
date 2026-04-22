@@ -77,6 +77,19 @@ describe("SecretExposureGuard", () => {
       .run();
     fixture.then_the_guard_is_in_idle_mode();
   });
+
+  test("Rule: once the 'hidden' mode has been reached, the guard stays in 'hidden' mode", async () => {
+    const two_minutes = 2 * ONE_MINUTE;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+    await fixture.when_user_activity_is()
+      .inactive_for(two_minutes)
+      .then()
+      .active_by("clicking")
+      .run();
+    fixture.then_the_guard_is_in_hidden_mode();
+  });
 });
 
 type SecretGuardMode = "visible" | "idle" | "hidden";
@@ -129,6 +142,12 @@ class SecretExposureGuard extends Subscriber<unknown> {
     this.schedule_idle_timer();
   }
 
+  public stop(): void {
+    this.user_activity_events.forEach((event) => {
+      this.driver.removeEventListener(event, this.handle_user_activity);
+    });
+  }
+
   // why an arroe function ? to preserve the context of `this` through the callbacks
   // I could have usee `this.handle_user_activity.bind(this)` too in the `addEventListener` call
   private handle_user_activity = () => {
@@ -150,6 +169,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
   private schedule_hidden_timer(): void {
     this.hidden_timer_id = setTimeout(() => {
       this.mode = "hidden";
+      this.stop();
     }, this.inactivity_duration);
   }
 
