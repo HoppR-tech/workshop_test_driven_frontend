@@ -61,6 +61,22 @@ describe("SecretExposureGuard", () => {
     await fixture.when_the_user_is_inactive_for(one_minute_and_one_second);
     fixture.then_the_guard_is_in_hidden_mode();
   });
+
+  test("Rule: the guard in 'idle' mode resets the 'hidden' timer on user activity as long as the 'hidden' mode has not been reached", async () => {
+    const four_seconds = 4 * ONE_SECOND;
+    const five_seconds = 5 * ONE_SECOND;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(five_seconds);
+    await fixture.when_user_activity_is()
+      .inactive_for(four_seconds)
+      .then()
+      .active_by("clicking")
+      .then()
+      .inactive_for(four_seconds)
+      .run();
+    fixture.then_the_guard_is_in_idle_mode();
+  });
 });
 
 type SecretGuardMode = "visible" | "idle" | "hidden";
@@ -118,6 +134,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
   private handle_user_activity = () => {
     this.mode = "visible";
 
+    this.clear_hidden_timer();
     this.schedule_idle_timer();
   }
 
@@ -140,6 +157,13 @@ class SecretExposureGuard extends Subscriber<unknown> {
     if (this.idle_timer_id) {
       clearTimeout(this.idle_timer_id);
       this.idle_timer_id = null;
+    }
+  }
+
+  private clear_hidden_timer(): void {
+    if (this.hidden_timer_id) {
+      clearTimeout(this.hidden_timer_id);
+      this.hidden_timer_id = null;
     }
   }
 }
