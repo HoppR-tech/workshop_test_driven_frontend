@@ -2,6 +2,7 @@ import { Subscriber } from "./SecretExposureGuard";
 
 const ONE_SECOND = 1000;
 const ONE_MINUTE = 60 * ONE_SECOND;
+const TWENTY_MINUTES = 20 * ONE_MINUTE;
 
 /* eslint-disable no-restricted-syntax */
 describe("SecretExposureGuard", () => {
@@ -90,9 +91,17 @@ describe("SecretExposureGuard", () => {
       .run();
     fixture.then_the_guard_is_in_hidden_mode();
   });
+
+  test("Rule: the guard has a 'locked' mode which is reached once the max time availability is reached", async () => {
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+    fixture.given_the_max_availability_is(TWENTY_MINUTES);
+    await fixture.when_the_user_is_inactive_for(TWENTY_MINUTES);
+    fixture.then_the_guard_is_in_locked_mode();
+  });
 });
 
-type SecretGuardMode = "visible" | "idle" | "hidden";
+type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
 type GracePeriod = number;
 type InactivityDuration = number;
 
@@ -109,11 +118,13 @@ class SecretExposureGuard extends Subscriber<unknown> {
   private _mode: SecretGuardMode = "visible";
   private idle_timer_id: NodeJS.Timeout | null = null;
   private hidden_timer_id: NodeJS.Timeout | null = null;
+  private locked_timer_id: NodeJS.Timeout | null = null;
 
   constructor(
+    private readonly driver: SecretExposureGuardDriver,
     private readonly grace_period: GracePeriod = ONE_SECOND,
     private readonly inactivity_duration: InactivityDuration = ONE_MINUTE,
-    private readonly driver: SecretExposureGuardDriver,
+    private readonly max_availability: InactivityDuration = TWENTY_MINUTES,
     private readonly user_activity_events = [
       "mousemove",
       "mousedown",
@@ -140,6 +151,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
     });
 
     this.schedule_idle_timer();
+    this.schedule_locked_timer();
   }
 
   public hide(): void {
@@ -158,6 +170,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
 
     this.clear_idle_timer();
     this.clear_hidden_timer();
+    this.clear_locked_timer();
   }
 
   // why an arroe function ? to preserve the context of `this` through the callbacks
@@ -185,6 +198,13 @@ class SecretExposureGuard extends Subscriber<unknown> {
     }, this.inactivity_duration);
   }
 
+  private schedule_locked_timer(): void {
+    this.locked_timer_id = setTimeout(() => {
+      this.mode = "locked";
+      this.stop();
+    }, this.max_availability);
+  }
+
   private clear_idle_timer(): void {
     if (this.idle_timer_id) {
       clearTimeout(this.idle_timer_id);
@@ -196,6 +216,13 @@ class SecretExposureGuard extends Subscriber<unknown> {
     if (this.hidden_timer_id) {
       clearTimeout(this.hidden_timer_id);
       this.hidden_timer_id = null;
+    }
+  }
+
+  private clear_locked_timer(): void {
+    if (this.locked_timer_id) {
+      clearTimeout(this.locked_timer_id);
+      this.locked_timer_id = null;
     }
   }
 }
@@ -292,13 +319,14 @@ class Fixture {
 
   private grace_period: number;
   private inactivity_duration: number;
+  private max_availability: number;
 
   constructor() {
     jest.useFakeTimers();
   }
 
   private create_guard() {
-    this.secretGuard = new SecretExposureGuard(this.grace_period, this.inactivity_duration, this.driver_mock);
+    this.secretGuard = new SecretExposureGuard(this.driver_mock, this.grace_period, this.inactivity_duration, this.max_availability);
   }
 
   private should_wait(): boolean {
@@ -329,6 +357,10 @@ class Fixture {
 
   public given_the_user_is_inactive_for(time: number) {
     this.time_to_wait = time;
+  }
+
+  public given_the_max_availability_is(max_availability: number) {
+    this.max_availability = max_availability;
   }
   //#endregion Given
 
@@ -373,6 +405,10 @@ class Fixture {
 
   public then_the_guard_is_in_hidden_mode() {
     expect(this.secretGuard.mode).toBe("hidden");
+  }
+
+  public then_the_guard_is_in_locked_mode() {
+    expect(this.secretGuard.mode).toBe("locked");
   }
   //#endregion Then
 }
