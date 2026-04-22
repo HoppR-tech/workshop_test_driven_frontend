@@ -128,6 +128,15 @@ describe("SecretExposureGuard", () => {
       fixture.then_the_guard_is_in_locked_mode();
     });
   });
+
+  describe("Rule: the grace period is subsctracted from the inactivity duration", () => {
+    test("for a grace period of 1 second, the inactivity duration should be 1 minute and not 1 minute and 1 second", async () => {
+      fixture.given_the_grace_period_is(ONE_SECOND);
+      fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+      await fixture.when_the_user_is_inactive_for(ONE_MINUTE);
+      fixture.then_the_guard_is_in_hidden_mode();
+    });
+  });
 });
 
 type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
@@ -236,10 +245,12 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   private schedule_hidden_timer(): void {
+    const inactivity_duration = this.inactivity_duration - this.grace_period;
+
     this.hidden_timer_id = setTimeout(() => {
       this.mode = "hidden";
       this.hide();
-    }, this.inactivity_duration);
+    }, inactivity_duration);
   }
 
   private schedule_locked_timer(): void {
