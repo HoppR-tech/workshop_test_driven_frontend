@@ -142,10 +142,22 @@ class SecretExposureGuard extends Subscriber<unknown> {
     this.schedule_idle_timer();
   }
 
+  public hide(): void {
+    this.user_activity_events.forEach((event) => {
+      this.driver.removeEventListener(event, this.handle_user_activity);
+    });
+
+    this.clear_idle_timer();
+    this.clear_hidden_timer();
+  }
+
   public stop(): void {
     this.user_activity_events.forEach((event) => {
       this.driver.removeEventListener(event, this.handle_user_activity);
     });
+
+    this.clear_idle_timer();
+    this.clear_hidden_timer();
   }
 
   // why an arroe function ? to preserve the context of `this` through the callbacks
@@ -169,7 +181,7 @@ class SecretExposureGuard extends Subscriber<unknown> {
   private schedule_hidden_timer(): void {
     this.hidden_timer_id = setTimeout(() => {
       this.mode = "hidden";
-      this.stop();
+      this.hide();
     }, this.inactivity_duration);
   }
 
