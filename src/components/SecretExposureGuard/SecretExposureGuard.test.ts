@@ -100,17 +100,33 @@ describe("SecretExposureGuard", () => {
     fixture.then_the_guard_is_in_locked_mode();
   });
 
-  test("Rule: an 'hidden' timer can be shown again", async () => {
-    const two_minutes = 2 * ONE_MINUTE;
+  describe("Rule: an 'hidden' timer can be shown again as long as the max availability as not been reached", () => {
+    test("shown again BEFORE the max time availability is reached", async () => {
+      const two_minutes = 2 * ONE_MINUTE;
 
-    fixture.given_the_grace_period_is(ONE_SECOND);
-    fixture.given_the_inactivity_duration_is(ONE_MINUTE);
-    await fixture.when_user_activity_is()
-      .inactive_for(two_minutes)
-      .then()
-      .show_again()
-      .run();
-    fixture.then_the_guard_is_in_visible_mode();
+      fixture.given_the_grace_period_is(ONE_SECOND);
+      fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+      await fixture.when_user_activity_is()
+        .inactive_for(two_minutes)
+        .then()
+        .show_again()
+        .run();
+      fixture.then_the_guard_is_in_visible_mode();
+    });
+
+    test("shown again AFTER the max time availability is reached", async () => {
+      const two_minutes = 2 * ONE_MINUTE;
+
+      fixture.given_the_grace_period_is(ONE_SECOND);
+      fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+      fixture.given_the_max_availability_is(two_minutes);
+      await fixture.when_user_activity_is()
+        .inactive_for(two_minutes)
+        .then()
+        .show_again()
+        .run();
+      fixture.then_the_guard_is_in_locked_mode();
+    });
   });
 });
 
@@ -173,8 +189,9 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   public show(): void {
-    this.add_user_activity_listeners();
+    if (this.mode === "locked") return;
 
+    this.add_user_activity_listeners();
     this.schedule_hidden_timer();
 
     this.mode = "visible";
