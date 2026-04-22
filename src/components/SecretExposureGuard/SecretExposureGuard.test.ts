@@ -99,6 +99,19 @@ describe("SecretExposureGuard", () => {
     await fixture.when_the_user_is_inactive_for(TWENTY_MINUTES);
     fixture.then_the_guard_is_in_locked_mode();
   });
+
+  test("Rule: an 'hidden' timer can be shown again", async () => {
+    const two_minutes = 2 * ONE_MINUTE;
+
+    fixture.given_the_grace_period_is(ONE_SECOND);
+    fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+    await fixture.when_user_activity_is()
+      .inactive_for(two_minutes)
+      .then()
+      .show_again()
+      .run();
+    fixture.then_the_guard_is_in_visible_mode();
+  });
 });
 
 type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
@@ -146,31 +159,45 @@ class SecretExposureGuard extends Subscriber<unknown> {
   }
 
   public start(): void {
-    this.user_activity_events.forEach((event) => {
-      this.driver.addEventListener(event, this.handle_user_activity);
-    });
+    this.add_user_activity_listeners();
 
     this.schedule_idle_timer();
     this.schedule_locked_timer();
   }
 
   public hide(): void {
-    this.user_activity_events.forEach((event) => {
-      this.driver.removeEventListener(event, this.handle_user_activity);
-    });
+    this.remove_user_activity_listeners();
 
     this.clear_idle_timer();
     this.clear_hidden_timer();
   }
 
+  public show(): void {
+    this.add_user_activity_listeners();
+
+    this.schedule_hidden_timer();
+
+    this.mode = "visible";
+  }
+
   public stop(): void {
-    this.user_activity_events.forEach((event) => {
-      this.driver.removeEventListener(event, this.handle_user_activity);
-    });
+    this.remove_user_activity_listeners();
 
     this.clear_idle_timer();
     this.clear_hidden_timer();
     this.clear_locked_timer();
+  }
+
+  private add_user_activity_listeners() {
+    this.user_activity_events.forEach((event) => {
+      this.driver.addEventListener(event, this.handle_user_activity);
+    });
+  }
+
+  private remove_user_activity_listeners() {
+    this.user_activity_events.forEach((event) => {
+      this.driver.removeEventListener(event, this.handle_user_activity);
+    });
   }
 
   // why an arroe function ? to preserve the context of `this` through the callbacks
@@ -271,6 +298,14 @@ class ActiveAction implements PlayableAction {
   }
 }
 
+class ShowAgainAction implements PlayableAction {
+  constructor(private readonly fixture: Fixture) { }
+
+  public async play() {
+    this.fixture.when_show_again();
+  }
+}
+
 class UserActivitySequence {
   private sequence: PlayableAction[] = [];
 
@@ -288,6 +323,11 @@ class UserActivitySequence {
 
   public active_by(action: UserActivityActions) {
     this.sequence.push(new ActiveAction(this.fixture, action));
+    return this;
+  }
+
+  public show_again() {
+    this.sequence.push(new ShowAgainAction(this.fixture));
     return this;
   }
 
@@ -391,6 +431,10 @@ class Fixture {
 
   public when_user_activity_is() {
     return new UserActivitySequence(this);
+  }
+
+  public when_show_again() {
+    this.secretGuard.show();
   }
   //#endregion When
 
