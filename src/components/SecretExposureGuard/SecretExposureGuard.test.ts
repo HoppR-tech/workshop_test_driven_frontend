@@ -1,4 +1,4 @@
-import { GracePeriod, SecretExposureGuard } from "./SecretExposureGuard";
+import { GracePeriod, SecretExposureGuard, SecretExposureGuardDriver } from "./SecretExposureGuard";
 
 const ONE_SECOND = 1000;
 const ONE_MINUTE = 60 * ONE_SECOND;
@@ -144,10 +144,42 @@ describe("SecretExposureGuard", () => {
     await fixture.when_the_user_hides();
     fixture.then_the_guard_is_in_hidden_mode();
   })
+
+  describe("Rule: the guard notify each second the remaining time", () => {
+    test("shown again BEFORE the max time availability is reached", async () => {
+      const fake_now = 100_000;
+      const five_minutes = 5 * ONE_MINUTE;
+      const fifteen_minutes = 15 * ONE_MINUTE;
+
+      fixture.given_now_is(fake_now);
+      fixture.given_the_grace_period_is(ONE_SECOND);
+      fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+      fixture.given_the_max_availability_is(TWENTY_MINUTES);
+
+      await fixture.when_the_user_is_inactive_for(fifteen_minutes);
+
+      fixture.then_the_remaining_time_is(five_minutes);
+    });
+
+    test("shown again AFTER the max time availability is reached", async () => {
+      const fake_now = 100_000;
+      const twenty_five_minutes = 25 * ONE_MINUTE;
+
+      fixture.given_now_is(fake_now);
+      fixture.given_the_grace_period_is(ONE_SECOND);
+      fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+      fixture.given_the_max_availability_is(TWENTY_MINUTES);
+
+      await fixture.when_the_user_is_inactive_for(twenty_five_minutes);
+
+      fixture.then_the_remaining_time_is(0);
+    });
+  });
 });
 
-class SecretExposureGuardDriverMock {
+class SecretExposureGuardDriverMock implements SecretExposureGuardDriver {
   private listeners = new Map<string, Set<EventListener>>();
+  private _now = 0;
 
   public addEventListener(event: string, listener: EventListener) {
     if (!this.listeners.has(event)) {
@@ -162,11 +194,17 @@ class SecretExposureGuardDriverMock {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public emit(event: string, payload?: any) {
-    console.log(event, payload);
-    console.log(this.listeners.get(event));
     this.listeners.get(event)?.forEach((listener) => {
       listener(payload);
     });
+  }
+
+  public set_now(now: number) {
+    this._now = now;
+  }
+
+  public now(): number {
+    return this._now;
   }
 }
 
@@ -294,6 +332,10 @@ class Fixture {
   public given_the_max_availability_is(max_availability: number) {
     this.max_availability = max_availability;
   }
+
+  public given_now_is(now: number) {
+    this.driver_mock.set_now(now);
+  }
   //#endregion Given
 
   //#region When
@@ -303,11 +345,13 @@ class Fixture {
 
   public async when_the_user_is_inactive() {
     this.start_guard();
+    this.driver_mock.set_now(this.driver_mock.now() + this.grace_period + 1);
     jest.advanceTimersByTime(this.grace_period + 1);
   }
 
   public async when_the_user_is_inactive_for(duration: number) {
     this.start_guard();
+    this.driver_mock.set_now(this.driver_mock.now() + duration);
     jest.advanceTimersByTime(duration);
   }
 
@@ -351,6 +395,10 @@ class Fixture {
 
   public then_the_guard_is_in_locked_mode() {
     expect(this.secretGuard.mode).toBe("locked");
+  }
+
+  public then_the_remaining_time_is(remaining_time: number) {
+    expect(this.secretGuard.remaining_time).toBe(remaining_time);
   }
   //#endregion Then
 }

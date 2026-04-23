@@ -11,6 +11,10 @@ class SecretExposureGuardDriverBrowserEvents {
   public removeEventListener(event: string, listener: EventListener) {
     window.removeEventListener(event, listener);
   }
+
+  public now(): number {
+    return Date.now();
+  }
 }
 
 export function useSecretExposureGuard({
@@ -40,18 +44,18 @@ export function useSecretExposureGuard({
     [guard],
   );
 
-  const mode = React.useSyncExternalStore(
+  const snapshot = React.useSyncExternalStore(
     subscribe,
     getSnapshot,
     getSnapshot,
   );
 
   React.useEffect(() => {
-    if (mode === "locked") {
+    if (snapshot.mode === "locked") {
       onLock?.();
     }
 
-  }, [mode, onLock])
+  }, [snapshot.mode, onLock])
 
   React.useEffect(() => {
     guard.start();
@@ -62,7 +66,8 @@ export function useSecretExposureGuard({
   }, [guard]);
 
   return {
-    mode,
+    mode: snapshot.mode,
+    remainingTime: snapshot.remaining_time,
     start: () => guard.start(),
     stop: () => guard.stop(),
     hide: () => guard.hide(),
