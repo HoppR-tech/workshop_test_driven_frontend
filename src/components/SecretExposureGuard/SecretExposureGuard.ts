@@ -1,37 +1,14 @@
 /* eslint-disable no-restricted-syntax */
 
+import { Subscriber } from "@/shared/Subscriber";
+
 const ONE_SECOND = 1000;
 const ONE_MINUTE = 60 * ONE_SECOND;
 const TWENTY_MINUTES = 20 * ONE_MINUTE;
 
-export abstract class Subscriber<Data> implements WithPayload {
-  private subscriptions = new Set<Subscription>();
-
-  public subscribe(subscription: Subscription) {
-    this.subscriptions.add(subscription);
-
-    return () => {
-      this.subscriptions.delete(subscription);
-    }
-  }
-
-  public getSnapshot() {
-    return this.getPayload();
-  }
-
-  protected emitChanges() {
-    console.log(this.subscriptions)
-    this.subscriptions.forEach((subscription) => {
-      subscription();
-    });
-  }
-
-  abstract getPayload(): Data;
-}
-
-type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
-type GracePeriod = number;
-type InactivityDuration = number;
+export type SecretGuardMode = "visible" | "idle" | "hidden" | "locked";
+export type GracePeriod = number;
+export type InactivityDuration = number;
 
 type SecretExposureGuardDriver = {
   addEventListener: typeof window.addEventListener;
@@ -202,9 +179,4 @@ export class SecretExposureGuard extends Subscriber<SecretGuardMode> {
 //   }
 // }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-type Subscription = Function;
 
-interface WithPayload {
-  getPayload(): unknown;
-}
