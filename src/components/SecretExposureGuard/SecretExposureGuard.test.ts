@@ -14,12 +14,15 @@ describe("SecretExposureGuard", () => {
 
   test("Rule: the guard is in 'visible' mode on start", async () => {
     await fixture.when_the_guard_start();
+
     fixture.then_the_guard_is_in_visible_mode();
   });
 
   test("Rule: after a defined _grace period_ of inactivity the guard goes to 'idle' mode", async () => {
     fixture.given_the_grace_period_is(ONE_SECOND);
+
     await fixture.when_the_user_is_inactive_for(ONE_SECOND);
+
     fixture.then_the_guard_is_in_idle_mode();
   });
 
@@ -35,7 +38,9 @@ describe("SecretExposureGuard", () => {
 
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_user_is_inactive_for(one_second_and_a_half);
+
     await fixture.when_the_user_is_active_by(action);
+
     fixture.then_the_guard_is_in_visible_mode();
   });
 
@@ -43,6 +48,7 @@ describe("SecretExposureGuard", () => {
     const zero_point_eight_seconds = 800;
 
     fixture.given_the_grace_period_is(ONE_SECOND);
+
     await fixture
       .when_user_activity_is()
       .inactive_for(zero_point_eight_seconds)
@@ -51,6 +57,7 @@ describe("SecretExposureGuard", () => {
       .then()
       .inactive_for(zero_point_eight_seconds)
       .run();
+
     fixture.then_the_guard_is_in_visible_mode();
   });
 
@@ -59,7 +66,9 @@ describe("SecretExposureGuard", () => {
 
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_inactivity_duration_is(ONE_MINUTE)
+
     await fixture.when_the_user_is_inactive_for(one_minute_and_one_second);
+
     fixture.then_the_guard_is_in_hidden_mode();
   });
 
@@ -69,6 +78,7 @@ describe("SecretExposureGuard", () => {
 
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_inactivity_duration_is(five_seconds);
+
     await fixture.when_user_activity_is()
       .inactive_for(four_seconds)
       .then()
@@ -76,6 +86,7 @@ describe("SecretExposureGuard", () => {
       .then()
       .inactive_for(four_seconds)
       .run();
+
     fixture.then_the_guard_is_in_idle_mode();
   });
 
@@ -84,11 +95,13 @@ describe("SecretExposureGuard", () => {
 
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+
     await fixture.when_user_activity_is()
       .inactive_for(two_minutes)
       .then()
       .active_by("clicking")
       .run();
+
     fixture.then_the_guard_is_in_hidden_mode();
   });
 
@@ -96,7 +109,9 @@ describe("SecretExposureGuard", () => {
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_inactivity_duration_is(ONE_MINUTE);
     fixture.given_the_max_availability_is(TWENTY_MINUTES);
+
     await fixture.when_the_user_is_inactive_for(TWENTY_MINUTES);
+
     fixture.then_the_guard_is_in_locked_mode();
   });
 
@@ -106,11 +121,13 @@ describe("SecretExposureGuard", () => {
 
       fixture.given_the_grace_period_is(ONE_SECOND);
       fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+
       await fixture.when_user_activity_is()
         .inactive_for(two_minutes)
         .then()
         .show_again()
         .run();
+
       fixture.then_the_guard_is_in_visible_mode();
     });
 
@@ -120,11 +137,13 @@ describe("SecretExposureGuard", () => {
       fixture.given_the_grace_period_is(ONE_SECOND);
       fixture.given_the_inactivity_duration_is(ONE_MINUTE);
       fixture.given_the_max_availability_is(two_minutes);
+
       await fixture.when_user_activity_is()
         .inactive_for(two_minutes)
         .then()
         .show_again()
         .run();
+
       fixture.then_the_guard_is_in_locked_mode();
     });
   });
@@ -133,7 +152,9 @@ describe("SecretExposureGuard", () => {
     test("for a grace period of 1 second, the inactivity duration should be 1 minute and not 1 minute and 1 second", async () => {
       fixture.given_the_grace_period_is(ONE_SECOND);
       fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+
       await fixture.when_the_user_is_inactive_for(ONE_MINUTE);
+
       fixture.then_the_guard_is_in_hidden_mode();
     });
   });
@@ -141,7 +162,9 @@ describe("SecretExposureGuard", () => {
   test("Rule: the guard can manually be switched to 'hidden' mode", async () => {
     fixture.given_the_grace_period_is(ONE_SECOND);
     fixture.given_the_inactivity_duration_is(ONE_MINUTE);
+
     await fixture.when_the_user_hides();
+
     fixture.then_the_guard_is_in_hidden_mode();
   })
 
