@@ -15,12 +15,19 @@ type SecretExposureGuardDriver = {
   removeEventListener: typeof window.removeEventListener;
 };
 
+interface SecretExposureGuardSnapshot {
+  mode: SecretGuardMode;
+}
+
 export class SecretExposureGuard extends Subscriber<SecretGuardMode> {
   getPayload(): SecretGuardMode {
     return this.mode;
   }
 
-  private _mode: SecretGuardMode = "visible";
+  private snapshot: SecretExposureGuardSnapshot = {
+    mode: "visible",
+  };
+
   private idle_timer_id: NodeJS.Timeout | null = null;
   private hidden_timer_id: NodeJS.Timeout | null = null;
   private locked_timer_id: NodeJS.Timeout | null = null;
@@ -43,12 +50,12 @@ export class SecretExposureGuard extends Subscriber<SecretGuardMode> {
   }
 
   private set mode(mode: SecretGuardMode) {
-    this._mode = mode;
+    this.snapshot.mode = mode;
     this.emitChanges();
   }
 
   public get mode(): SecretGuardMode {
-    return this._mode;
+    return this.snapshot.mode;
   }
 
   public start(): void {
