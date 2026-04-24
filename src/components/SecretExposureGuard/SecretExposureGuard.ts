@@ -208,33 +208,3 @@ export class SecretExposureGuard extends Subscriber<SecretExposureGuardSnapshot>
   }
 }
 
-// type Listener<EventMap extends Record<string, any>, Key extends keyof EventMap = string> = (payload: EventMap[Key]) => void;
-
-// export class EventEmitter<
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   EventMap extends Record<string, any>,
-//   EventNames extends keyof EventMap = keyof EventMap,
-// > {
-//
-//   private listeners = new Map<EventNames, Set<Listener<EventMap>>>();
-//
-//   public on<Key extends EventNames & string>(event: Key, listener: Listener<EventMap, Key>) {
-//     if (!this.listeners.has(event)) {
-//       this.listeners.set(event, new Set());
-//     }
-//     this.listeners.get(event)!.add(listener);
-//     return () => this.off(event, listener);
-//   }
-//
-//   public off<Key extends EventNames>(event: Key, listener: Listener<EventMap>) {
-//     this.listeners.get(event)?.delete(listener);
-//   }
-//
-//   public emit<Key extends EventNames>(event: Key, payload: EventMap[Key]) {
-//     this.listeners.get(event)?.forEach((listener) => {
-//       (listener as Listener<EventMap, Key>)(payload);
-//     });
-//   }
-// }
-
-
