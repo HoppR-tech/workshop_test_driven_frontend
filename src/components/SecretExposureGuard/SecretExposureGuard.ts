@@ -55,11 +55,6 @@ export class SecretExposureGuard extends Subscriber<SecretExposureGuardSnapshot>
     super();
   }
 
-  private set mode(mode: SecretGuardMode) {
-    this.snapshot.mode = mode;
-    this.emitChanges();
-  }
-
   public get mode(): SecretGuardMode {
     return this.snapshot.mode;
   }
