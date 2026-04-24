@@ -18,8 +18,14 @@ class SecretExposureGuardDriverBrowserEvents {
 }
 
 export function useSecretExposureGuard({
+  gracePeriod,
+  inactivityDuration,
+  maxAvailability,
   onLock,
 }: {
+  gracePeriod?: number;
+  inactivityDuration?: number;
+  maxAvailability?: number;
   onLock?: () => void;
 }) {
   const guardRef = React.useRef<SecretExposureGuard | null>(null);
@@ -27,9 +33,9 @@ export function useSecretExposureGuard({
   if (guardRef.current === null) {
     guardRef.current = new SecretExposureGuard(
       new SecretExposureGuardDriverBrowserEvents(),
-      1000,
-      10_000,
-      120_000
+      gracePeriod,
+      inactivityDuration,
+      maxAvailability,
     );
   }
   const guard = guardRef.current;
